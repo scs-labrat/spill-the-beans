@@ -1,0 +1,19 @@
+
+export interface Persona {
+  id: string;
+  name: string;
+  role: string;
+  psychology: string;
+  strengths: string;
+  weaknesses: string;
+  targetInfo: string[];
+  conversationStarters: string[];
+}
+
+export interface ConversationLogEntry {
+  speaker: 'User' | 'Persona' | 'System';
+  text: string;
+  reasoning?: string;
+}
+
+export type AppState = 'menu' | 'inConversation' | 'managingPersonas';

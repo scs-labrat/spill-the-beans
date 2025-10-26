@@ -1,0 +1,7 @@
+{
+  "name": "Elicitation Training Simulator",
+  "description": "A web-based AI role-playing simulator to practice elicitation techniques. Engage in realistic conversations with diverse AI personas, manage their profiles, and hone your skills in subtly gathering information.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
