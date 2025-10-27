@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Content, Modality } from "@google/genai";
-import type { Persona, ConversationLogEntry } from '../types';
+import type { Persona, ConversationLogEntry, AnalysisResult } from '../types';
 
 if (!process.env.API_KEY) {
   throw new Error("API_KEY environment variable not set");
@@ -81,6 +82,77 @@ export const generatePersonaResponse = async (
     reasoning: "Fallback due to repeated LLM errors.",
     response: "I'm sorry, I seem to be having a bit of trouble. Could you please repeat that?"
   };
+};
+
+export const analyzeConversation = async (
+    persona: Persona,
+    targetInfo: string,
+    log: ConversationLogEntry[]
+): Promise<AnalysisResult> => {
+    const transcript = log.map(entry => `${entry.speaker}: ${entry.text}`).join('\n');
+    const userTurns = log.filter(entry => entry.speaker === 'User').length;
+
+    const systemInstruction = `
+        You are an expert elicitation training coach. Your task is to analyze a conversation transcript between a user and an AI-powered persona. You must provide specific, actionable feedback to help the user improve their elicitation skills.
+
+        **The Persona's Profile:**
+        - Name: "${persona.name}"
+        - Role: "${persona.role}"
+        - Psychology: "${persona.psychology}"
+        - Strengths (Resistance Tactics): "${persona.strengths}"
+        - Weaknesses (Vulnerabilities): "${persona.weaknesses}"
+
+        **The Secret Information:**
+        The user's objective was to elicit this specific piece of information: "${targetInfo}"
+
+        **Your Analysis Task:**
+        Based on the persona's profile and the full conversation transcript, provide a detailed analysis. Your response MUST be a single, valid JSON object and nothing else. The JSON object must conform to the structure I expect. Be critical but constructive in your analysis. Do not wrap the JSON in markdown.
+
+        **Scoring:**
+        Finally, based on your entire analysis, calculate a final score for the user's performance on a scale from 0 to 5000. Use the following rubric:
+        - **Information Elicited (Base Score):** Assign 1000 points if the user successfully elicited the target information. Assign 0 points if they did not.
+        - **Successful Techniques:** Add 250 points for EACH distinct successful technique you identified.
+        - **Missed Opportunities:** Subtract 50 points for EACH missed opportunity you identified.
+        - **Efficiency Bonus:** If the information was elicited, add a bonus of (500 / ${userTurns || 1}). For example, if it took 5 user turns, add 100 points. If it took 2 turns, add 250 points. Cap this bonus at 500.
+        - **Overall Impression (Coach's Discretion):** Add or subtract up to 250 points based on the overall subtlety, rapport-building, and naturalness of the conversation. Explain this discretionary adjustment briefly in the 'overallFeedback'.
+
+        The final JSON object must include a "score" field with the calculated integer value.
+    `;
+    
+    for (let i = 0; i < 3; i++) {
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-pro',
+                contents: [{ role: 'user', parts: [{ text: `Here is the conversation transcript:\n\n${transcript}` }] }],
+                config: {
+                    systemInstruction: systemInstruction,
+                    responseMimeType: "application/json",
+                    temperature: 0.5,
+                }
+            });
+
+            const cleanedText = response.text.trim();
+            const analysis = JSON.parse(cleanedText) as AnalysisResult;
+
+            if (analysis && analysis.summary && analysis.overallFeedback && typeof analysis.score === 'number') {
+                return analysis;
+            }
+            console.warn("LLM analysis error: Received valid JSON but missing required keys. Retrying...", analysis);
+
+        } catch (error) {
+            console.error(`LLM Analysis Error (Attempt ${i + 1}):`, error);
+            await new Promise(res => setTimeout(res, 1000));
+        }
+    }
+
+    return {
+        summary: "Could not generate analysis due to an API error.",
+        infoElicited: false,
+        successfulTechniques: [],
+        missedOpportunities: [],
+        overallFeedback: "Please try another session. If the problem persists, check the API connection.",
+        score: 0,
+    };
 };
 
 const MALE_VOICES = ['Puck', 'Charon', 'Fenrir'];

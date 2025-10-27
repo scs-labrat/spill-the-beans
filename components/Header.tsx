@@ -1,11 +1,26 @@
 
 import React from 'react';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  currentUser: string | null;
+  onLogout: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
   return (
-    <header className="bg-brand-secondary p-4 shadow-md text-center">
-      <h1 className="text-2xl md:text-3xl font-bold text-brand-accent">Elicitation Training Simulator</h1>
-      <p className="text-brand-subtle text-sm md:text-base">Hone your communication skills with AI-powered role-playing scenarios.</p>
+    <header className="p-4 md:p-6 flex justify-between items-center">
+      <h1 className="text-2xl md:text-3xl font-bold text-brand-primary tracking-wider">ElicitSim.</h1>
+      {currentUser && (
+        <div className="flex items-center gap-4">
+          <span className="text-brand-subtle">Welcome, <span className="font-bold text-brand-text">{currentUser}</span></span>
+          <button 
+            onClick={onLogout} 
+            className="border border-brand-primary text-brand-primary font-semibold hover:bg-brand-primary hover:text-white px-3 py-1 rounded-lg transition-colors text-sm"
+          >
+            Logout
+          </button>
+        </div>
+      )}
     </header>
   );
 };

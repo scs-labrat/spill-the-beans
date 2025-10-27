@@ -16,4 +16,34 @@ export interface ConversationLogEntry {
   reasoning?: string;
 }
 
-export type AppState = 'menu' | 'inConversation' | 'managingPersonas';
+export interface AnalysisTechnique {
+  technique: string;
+  example: string;
+  analysis: string;
+}
+
+export interface AnalysisOpportunity {
+    technique: string;
+    suggestion: string;
+    example: string;
+}
+
+export interface AnalysisResult {
+    summary: string;
+    infoElicited: boolean;
+    successfulTechniques: AnalysisTechnique[];
+    missedOpportunities: AnalysisOpportunity[];
+    overallFeedback: string;
+    score: number;
+}
+
+export interface LeaderboardEntry {
+    name: string;
+    score: number;
+    personaName: string;
+    date: string;
+}
+
+export type AppState = 'menu' | 'preConversation' | 'inConversation' | 'managingPersonas' | 'sessionAnalysis' | 'leaderboard';
+
+export type InputMode = 'speech' | 'text';

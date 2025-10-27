@@ -6,17 +6,24 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Elicitation Training Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
+            fontFamily: {
+              sans: ['Poppins', 'sans-serif'],
+            },
             colors: {
-              'brand-primary': '#1e293b',
-              'brand-secondary': '#334155',
-              'brand-accent': '#0ea5e9',
-              'brand-text': '#e2e8f0',
-              'brand-subtle': '#94a3b8',
+              'brand-primary': '#1f2937', // gray-800
+              'brand-secondary': '#f3f4f6', // gray-100
+              'brand-accent': '#f43f5e', // rose-500
+              'brand-text': '#1f2937', // gray-800
+              'brand-subtle': '#6b7280', // gray-500
+              'brand-content-bg': '#ffffff',
             },
           }
         }
@@ -33,7 +40,7 @@
 }
 </script>
 </head>
-  <body class="bg-brand-primary text-brand-text">
+  <body class="bg-brand-secondary text-brand-text">
     <div id="root"></div>
   </body>
 </html>

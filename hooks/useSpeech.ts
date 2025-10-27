@@ -47,6 +47,7 @@ async function decodeAudioData(
 
 export const useSpeech = (onTranscript: (transcript: string) => void) => {
   const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const recognitionRef = useRef<any | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
@@ -65,10 +66,18 @@ export const useSpeech = (onTranscript: (transcript: string) => void) => {
       const transcript = event.results[0][0].transcript;
       onTranscript(transcript);
       setIsListening(false);
+      setSpeechError(null); // Clear error on success
     };
 
     recognition.onerror = (event) => {
       console.error("Speech recognition error:", event.error);
+      if (event.error === 'no-speech') {
+        setSpeechError("Sorry, I didn't catch that. Please try again.");
+      } else if (event.error === 'audio-capture') {
+        setSpeechError("Audio capture error. Check microphone and permissions.");
+      } else {
+        setSpeechError("A speech recognition error occurred.");
+      }
       setIsListening(false);
     };
 
@@ -82,10 +91,12 @@ export const useSpeech = (onTranscript: (transcript: string) => void) => {
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
       try {
+        setSpeechError(null); // Clear previous errors
         recognitionRef.current.start();
         setIsListening(true);
       } catch (error) {
         console.error("Error starting speech recognition:", error);
+        setSpeechError("Could not start listening. Check microphone permissions.");
       }
     }
   }, [isListening]);
@@ -135,5 +146,5 @@ export const useSpeech = (onTranscript: (transcript: string) => void) => {
     }
   }, []);
 
-  return { isListening, startListening, stopListening, speak, speechRecognitionAvailable };
+  return { isListening, startListening, stopListening, speak, speechRecognitionAvailable, speechError };
 };
