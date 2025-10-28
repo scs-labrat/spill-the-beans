@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Content, Modality } from "@google/genai";
+import { GoogleGenAI, Content, Modality, Type } from "@google/genai";
 import type { Persona, ConversationLogEntry, AnalysisResult } from '../types';
 
 if (!process.env.API_KEY) {
@@ -84,14 +84,87 @@ export const generatePersonaResponse = async (
   };
 };
 
+// FIX: Add generateSpeech function for text-to-speech synthesis.
+export const generateSpeech = async (text: string, voiceName: string): Promise<string | null> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voiceName },
+          },
+        },
+      },
+    });
+    
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+    if (base64Audio) {
+      return base64Audio;
+    }
+
+    console.warn("LLM TTS Error: No audio data in response.");
+    return null;
+  } catch (error) {
+    console.error("LLM TTS Error:", error);
+    return null;
+  }
+};
+
+const analysisSchema = {
+    type: Type.OBJECT,
+    properties: {
+      summary: {
+        type: Type.STRING,
+        description: "A one-sentence summary of the conversation's outcome from the user's perspective."
+      },
+      infoElicited: {
+        type: Type.BOOLEAN,
+        description: "A boolean indicating if the user successfully elicited the target secret information."
+      },
+      successfulTechniques: {
+        type: Type.ARRAY,
+        description: "An array of specific elicitation techniques the user employed successfully. If none, this must be an empty array.",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            technique: { type: Type.STRING, description: "The name of the elicitation technique used (e.g., 'Flattery', 'Feigned Ignorance')." },
+            example: { type: Type.STRING, description: "A direct quote from the user's part of the conversation that exemplifies this technique." },
+            analysis: { type: Type.STRING, description: "A brief analysis of why this technique was effective against this specific persona's psychology." }
+          },
+          required: ['technique', 'example', 'analysis']
+        }
+      },
+      missedOpportunities: {
+        type: Type.ARRAY,
+        description: "An array of specific moments where the user missed an opportunity to apply an elicitation technique. If none, this must be an empty array.",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            technique: { type: Type.STRING, description: "The name of the technique that could have been used (e.g., 'Deliberate False Statement')." },
+            suggestion: { type: Type.STRING, description: "A description of the moment in the conversation (e.g., 'When the persona mentioned X, you could have...') where the technique could have been applied." },
+            example: { type: Type.STRING, description: "A concrete example of what the user could have said to apply the technique." }
+          },
+          required: ['technique', 'suggestion', 'example']
+        }
+      },
+      overallFeedback: {
+        type: Type.STRING,
+        description: "A final, concise paragraph of constructive feedback for the user. It should summarize their performance, mention their strengths, and offer one or two key tips for improvement in the next session."
+      }
+    },
+    required: ['summary', 'infoElicited', 'successfulTechniques', 'missedOpportunities', 'overallFeedback']
+};
+
 export const analyzeConversation = async (
     persona: Persona,
     targetInfo: string,
     log: ConversationLogEntry[]
 ): Promise<AnalysisResult> => {
     const transcript = log.map(entry => `${entry.speaker}: ${entry.text}`).join('\n');
-    const userTurns = log.filter(entry => entry.speaker === 'User').length;
-
     const systemInstruction = `
         You are an expert elicitation training coach. Your task is to analyze a conversation transcript between a user and an AI-powered persona. You must provide specific, actionable feedback to help the user improve their elicitation skills.
 
@@ -106,17 +179,7 @@ export const analyzeConversation = async (
         The user's objective was to elicit this specific piece of information: "${targetInfo}"
 
         **Your Analysis Task:**
-        Based on the persona's profile and the full conversation transcript, provide a detailed analysis. Your response MUST be a single, valid JSON object and nothing else. The JSON object must conform to the structure I expect. Be critical but constructive in your analysis. Do not wrap the JSON in markdown.
-
-        **Scoring:**
-        Finally, based on your entire analysis, calculate a final score for the user's performance on a scale from 0 to 5000. Use the following rubric:
-        - **Information Elicited (Base Score):** Assign 1000 points if the user successfully elicited the target information. Assign 0 points if they did not.
-        - **Successful Techniques:** Add 250 points for EACH distinct successful technique you identified.
-        - **Missed Opportunities:** Subtract 50 points for EACH missed opportunity you identified.
-        - **Efficiency Bonus:** If the information was elicited, add a bonus of (500 / ${userTurns || 1}). For example, if it took 5 user turns, add 100 points. If it took 2 turns, add 250 points. Cap this bonus at 500.
-        - **Overall Impression (Coach's Discretion):** Add or subtract up to 250 points based on the overall subtlety, rapport-building, and naturalness of the conversation. Explain this discretionary adjustment briefly in the 'overallFeedback'.
-
-        The final JSON object must include a "score" field with the calculated integer value.
+        Based on the persona's profile and the full conversation transcript, provide a detailed analysis. Be critical but constructive. Your response will be structured as a JSON object according to a predefined schema, so focus on the quality of the content for each field.
     `;
     
     for (let i = 0; i < 3; i++) {
@@ -127,6 +190,7 @@ export const analyzeConversation = async (
                 config: {
                     systemInstruction: systemInstruction,
                     responseMimeType: "application/json",
+                    responseSchema: analysisSchema,
                     temperature: 0.5,
                 }
             });
@@ -134,10 +198,10 @@ export const analyzeConversation = async (
             const cleanedText = response.text.trim();
             const analysis = JSON.parse(cleanedText) as AnalysisResult;
 
-            if (analysis && analysis.summary && analysis.overallFeedback && typeof analysis.score === 'number') {
+            if (analysis && typeof analysis === 'object') {
                 return analysis;
             }
-            console.warn("LLM analysis error: Received valid JSON but missing required keys. Retrying...", analysis);
+            console.warn("LLM analysis error: Response was not a valid object despite schema. Retrying...", analysis);
 
         } catch (error) {
             console.error(`LLM Analysis Error (Attempt ${i + 1}):`, error);
@@ -146,60 +210,10 @@ export const analyzeConversation = async (
     }
 
     return {
-        summary: "Could not generate analysis due to an API error.",
+        summary: "Could not generate analysis due to a repeated API error.",
         infoElicited: false,
         successfulTechniques: [],
         missedOpportunities: [],
-        overallFeedback: "Please try another session. If the problem persists, check the API connection.",
-        score: 0,
+        overallFeedback: "We were unable to analyze this session. Please try another one. If the problem persists, there may be a connection issue."
     };
-};
-
-const MALE_VOICES = ['Puck', 'Charon', 'Fenrir'];
-const FEMALE_VOICES = ['Kore', 'Zephyr'];
-const MALE_NAMES = new Set(['Frank', 'Kevin', 'David']);
-const FEMALE_NAMES = new Set(['Brenda', 'Sarah']);
-
-/**
- * Selects a gender-appropriate voice for a given persona.
- * @param persona The persona object.
- * @returns The name of a prebuilt voice.
- */
-export const getVoiceForPersona = (persona: Persona): string => {
-    if (MALE_NAMES.has(persona.name)) {
-        return MALE_VOICES[Math.floor(Math.random() * MALE_VOICES.length)];
-    }
-    if (FEMALE_NAMES.has(persona.name)) {
-        return FEMALE_VOICES[Math.floor(Math.random() * FEMALE_VOICES.length)];
-    }
-    // Fallback for custom personas or unlisted names
-    return FEMALE_VOICES[0];
-};
-
-export const generateSpeech = async (text: string, voiceName: string): Promise<string | null> => {
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text }] }],
-            config: {
-                responseModalities: [Modality.AUDIO],
-                speechConfig: {
-                    voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: voiceName },
-                    },
-                },
-            },
-        });
-
-        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (typeof base64Audio === 'string') {
-            return base64Audio;
-        }
-        console.warn("Could not extract audio data from Gemini response.");
-        return null;
-
-    } catch (error) {
-        console.error("Error generating speech from Gemini:", error);
-        return null;
-    }
 };

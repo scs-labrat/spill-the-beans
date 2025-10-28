@@ -34,16 +34,6 @@ export interface AnalysisResult {
     successfulTechniques: AnalysisTechnique[];
     missedOpportunities: AnalysisOpportunity[];
     overallFeedback: string;
-    score: number;
 }
 
-export interface LeaderboardEntry {
-    name: string;
-    score: number;
-    personaName: string;
-    date: string;
-}
-
-export type AppState = 'menu' | 'preConversation' | 'inConversation' | 'managingPersonas' | 'sessionAnalysis' | 'leaderboard';
-
-export type InputMode = 'speech' | 'text';
+export type AppState = 'menu' | 'inConversation' | 'managingPersonas' | 'sessionAnalysis';

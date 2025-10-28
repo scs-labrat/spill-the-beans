@@ -1,45 +1,17 @@
-
 import React, { useState } from 'react';
 import type { Persona } from '../types';
 import { PlusIcon } from './icons';
 import PersonaDetailView from './PersonaDetailView';
-import { INITIAL_PERSONAS } from '../constants';
-
-const initialPersonaIds = new Set(INITIAL_PERSONAS.map(p => p.id));
-
-const sanitizeInput = (input: string): string => {
-  if (!input) return '';
-  const map: { [key: string]: string } = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#x27;',
-  };
-  const reg = /[&<>"']/ig;
-  return input.replace(reg, (match) => map[match]);
-};
 
 interface PersonaManagerProps {
   personas: Persona[];
   onAddPersona: (persona: Omit<Persona, 'id'>) => void;
-  onUpdatePersona: (persona: Persona) => void;
   onBack: () => void;
 }
 
-const PersonaCard: React.FC<{ persona: Persona; onView: () => void; onEdit: () => void; isEditing?: boolean; }> = ({ persona, onView, onEdit, isEditing }) => {
-    const isDefault = initialPersonaIds.has(persona.id);
-    
-    const handleEditClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onEdit();
-    };
-    
+const PersonaCard: React.FC<{ persona: Persona; onView: () => void; }> = ({ persona, onView }) => {
     return (
-      <div 
-        onClick={onView} 
-        className={`p-4 rounded-lg border shadow-sm hover:border-brand-accent hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between ${isEditing ? 'bg-rose-50 border-brand-accent border-2' : 'bg-brand-content-bg border-gray-200'}`}
-      >
+      <div onClick={onView} className="bg-brand-content-bg p-4 rounded-lg border border-gray-200 shadow-sm hover:border-brand-accent hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col">
         <div>
             <h3 className="text-xl font-bold text-brand-accent">{persona.name} - <span className="text-lg font-normal text-brand-text">{persona.role}</span></h3>
             <div className="mt-3 space-y-2 text-sm">
@@ -54,20 +26,14 @@ const PersonaCard: React.FC<{ persona: Persona; onView: () => void; onEdit: () =
             </div>
             </div>
         </div>
-        {!isDefault && (
-          <div className="mt-4 flex justify-end">
-             <button onClick={handleEditClick} className="text-sm bg-brand-secondary hover:bg-gray-200 px-3 py-1 rounded-md transition-colors text-brand-primary">Edit</button>
-          </div>
-        )}
       </div>
     );
 };
 
 
-const PersonaManager: React.FC<PersonaManagerProps> = ({ personas, onAddPersona, onUpdatePersona, onBack }) => {
+const PersonaManager: React.FC<PersonaManagerProps> = ({ personas, onAddPersona, onBack }) => {
   const [showForm, setShowForm] = useState(false);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
-  const [editingPersona, setEditingPersona] = useState<Persona | null>(null);
 
   const initialFormState = {
     name: '', role: '', psychology: '', strengths: '', weaknesses: '', targetInfo: '', conversationStarters: ''
@@ -80,45 +46,24 @@ const PersonaManager: React.FC<PersonaManagerProps> = ({ personas, onAddPersona,
   };
   
   const handleStartAddNew = () => {
-    setEditingPersona(null);
     setFormData(initialFormState);
-    setShowForm(true);
-  };
-
-  const handleStartEdit = (persona: Persona) => {
-    setEditingPersona(persona);
-    setFormData({
-      ...persona,
-      targetInfo: persona.targetInfo.join('\n'),
-      conversationStarters: persona.conversationStarters.join('\n'),
-    });
-    setSelectedPersona(null);
     setShowForm(true);
   };
 
   const handleCancelForm = () => {
       setShowForm(false);
-      setEditingPersona(null);
       setFormData(initialFormState);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const commonData = {
-      name: sanitizeInput(formData.name),
-      role: sanitizeInput(formData.role),
-      psychology: sanitizeInput(formData.psychology),
-      strengths: sanitizeInput(formData.strengths),
-      weaknesses: sanitizeInput(formData.weaknesses),
-      targetInfo: formData.targetInfo.split('\n').filter(Boolean).map(sanitizeInput),
-      conversationStarters: formData.conversationStarters.split('\n').filter(Boolean).map(sanitizeInput),
+      ...formData,
+      targetInfo: formData.targetInfo.split('\n').filter(Boolean),
+      conversationStarters: formData.conversationStarters.split('\n').filter(Boolean),
     };
 
-    if (editingPersona) {
-      onUpdatePersona({ ...commonData, id: editingPersona.id });
-    } else {
-      onAddPersona(commonData);
-    }
+    onAddPersona(commonData);
     
     handleCancelForm();
   };
@@ -134,13 +79,12 @@ const PersonaManager: React.FC<PersonaManagerProps> = ({ personas, onAddPersona,
   ] as const;
 
   if (selectedPersona) {
-    const isDefault = initialPersonaIds.has(selectedPersona.id);
-    return <PersonaDetailView persona={selectedPersona} onBack={() => setSelectedPersona(null)} onEdit={!isDefault ? () => handleStartEdit(selectedPersona) : undefined} />;
+    return <PersonaDetailView persona={selectedPersona} onBack={() => setSelectedPersona(null)} />;
   }
 
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6">
+    <div className="max-w-6xl mx-auto p-4 md:p-6 h-full overflow-y-auto">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold">Manage Personas</h2>
         <button onClick={onBack} className="border border-brand-primary text-brand-primary font-semibold hover:bg-brand-primary hover:text-white px-4 py-2 rounded-lg transition-colors">
@@ -156,7 +100,7 @@ const PersonaManager: React.FC<PersonaManagerProps> = ({ personas, onAddPersona,
 
       {showForm && (
         <div className="bg-brand-content-bg p-6 rounded-lg mb-8 border border-gray-200">
-            <h3 className="text-2xl font-bold mb-4 text-brand-accent">{editingPersona ? `Editing: ${editingPersona.name}`: 'Create a New Persona'}</h3>
+            <h3 className="text-2xl font-bold mb-4 text-brand-accent">Create a New Persona</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {formFields.map(field => (
@@ -172,14 +116,14 @@ const PersonaManager: React.FC<PersonaManagerProps> = ({ personas, onAddPersona,
                 </div>
                 <div className="flex justify-end gap-4 pt-4">
                     <button type="button" onClick={handleCancelForm} className="border border-brand-subtle text-brand-subtle font-semibold hover:bg-brand-secondary px-4 py-2 rounded-lg">Cancel</button>
-                    <button type="submit" className="bg-brand-accent hover:bg-brand-accent/80 text-white font-bold px-4 py-2 rounded-lg">{editingPersona ? 'Save Changes' : 'Save Persona'}</button>
+                    <button type="submit" className="bg-brand-accent hover:bg-brand-accent/80 text-white font-bold px-4 py-2 rounded-lg">Save Persona</button>
                 </div>
             </form>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {personas.map(p => <PersonaCard key={p.id} persona={p} onView={() => setSelectedPersona(p)} onEdit={() => handleStartEdit(p)} isEditing={editingPersona?.id === p.id} />)}
+        {personas.map(p => <PersonaCard key={p.id} persona={p} onView={() => setSelectedPersona(p)} />)}
       </div>
     </div>
   );

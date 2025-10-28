@@ -51,9 +51,3 @@ export const TargetIcon: React.FC<{ className?: string }> = ({ className }) => (
         <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 5a7 7 0 1 1 0 14 7 7 0 0 1 0-14Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" />
     </svg>
 );
-
-export const TrophyIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="M17.5 3A2.5 2.5 0 0 0 15 5.5V6H9V5.5A2.5 2.5 0 0 0 6.5 3H3v2.5A2.5 2.5 0 0 0 5.5 8H6v1.172a4 4 0 0 0 .618 2.036-3.001 3.001 0 0 0-2.036 3.618 3 3 0 0 0 3.618 2.036 4 4 0 0 0 6.592 0 3 3 0 0 0 3.618-2.036 3.001 3.001 0 0 0-2.036-3.618A4 4 0 0 0 18 9.172V8h.5A2.5 2.5 0 0 0 21 5.5V3h-3.5ZM9 8h6v1.08a6.002 6.002 0 0 1-5.372 5.372L9 15.08V8Zm-1.5-1A1.5 1.5 0 0 1 9 5.5V4h6v1.5a1.5 1.5 0 0 1-1.5 1.5H7.5Z" clipRule="evenodd" />
-    </svg>
-);

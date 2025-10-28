@@ -1,13 +1,12 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import type { AnalysisResult } from '../types';
-import { CheckCircleIcon, XCircleIcon, LightbulbIcon, TargetIcon, BrainIcon, TrophyIcon } from './icons';
+import { CheckCircleIcon, XCircleIcon, LightbulbIcon, TargetIcon, BrainIcon } from './icons';
 
 interface SessionAnalysisViewProps {
     analysis: AnalysisResult | null;
     isLoading: boolean;
     onReturnToMenu: () => void;
-    onSaveScore: (name: string, score: number) => void;
 }
 
 const LoadingView: React.FC = () => (
@@ -31,17 +30,7 @@ const AnalysisCard: React.FC<{ title: string; icon: React.ReactNode; children: R
 );
 
 
-const SessionAnalysisView: React.FC<SessionAnalysisViewProps> = ({ analysis, isLoading, onReturnToMenu, onSaveScore }) => {
-    const [userName, setUserName] = useState('');
-    const [isSubmitted, setIsSubmitted] = useState(false);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (analysis && analysis.score > 0) {
-            onSaveScore(userName, analysis.score);
-            setIsSubmitted(true);
-        }
-    };
+const SessionAnalysisView: React.FC<SessionAnalysisViewProps> = ({ analysis, isLoading, onReturnToMenu }) => {
 
     if (isLoading || !analysis) {
         return (
@@ -52,19 +41,13 @@ const SessionAnalysisView: React.FC<SessionAnalysisViewProps> = ({ analysis, isL
     }
 
     return (
-        <div className="max-w-4xl mx-auto p-4 md:p-6">
+        <div className="max-w-4xl mx-auto p-4 md:p-6 h-full overflow-y-auto">
             <div className="space-y-6">
-                <div className={`p-6 rounded-lg text-white flex flex-col md:flex-row items-center gap-4 ${analysis.infoElicited ? 'bg-green-600' : 'bg-red-500'}`}>
-                    <div className="flex-shrink-0">
-                         {analysis.infoElicited ? <CheckCircleIcon className="w-12 h-12" /> : <XCircleIcon className="w-12 h-12" />}
-                    </div>
-                    <div className="flex-grow text-center md:text-left">
+                <div className={`p-6 rounded-lg text-white flex items-center gap-4 ${analysis.infoElicited ? 'bg-green-600' : 'bg-red-500'}`}>
+                    {analysis.infoElicited ? <CheckCircleIcon className="w-12 h-12 flex-shrink-0" /> : <XCircleIcon className="w-12 h-12 flex-shrink-0" />}
+                    <div>
                         <h2 className="text-2xl font-bold">{analysis.infoElicited ? "Objective Achieved!" : "Objective Not Met"}</h2>
                         <p className="text-lg opacity-90">{analysis.summary}</p>
-                    </div>
-                    <div className="bg-white/20 p-3 rounded-lg text-center">
-                        <p className="text-sm font-bold opacity-80">FINAL SCORE</p>
-                        <p className="text-4xl font-bold">{analysis.score}</p>
                     </div>
                 </div>
 
@@ -95,35 +78,8 @@ const SessionAnalysisView: React.FC<SessionAnalysisViewProps> = ({ analysis, isL
                 <AnalysisCard title="Coach's Final Word" icon={<BrainIcon className="w-6 h-6 text-brand-subtle" />}>
                     <p>{analysis.overallFeedback}</p>
                 </AnalysisCard>
-                
-                {!isSubmitted && analysis.score > 0 && (
-                    <div className="bg-brand-content-bg p-4 rounded-lg border border-yellow-400">
-                         <h3 className="text-xl font-bold text-center text-yellow-600 mb-2">High Score!</h3>
-                         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row items-center gap-2">
-                            <input
-                                type="text"
-                                value={userName}
-                                onChange={(e) => setUserName(e.target.value)}
-                                placeholder="Enter your name for the leaderboard"
-                                required
-                                className="flex-grow w-full bg-brand-secondary p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                            />
-                            <button type="submit" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                                <TrophyIcon className="w-5 h-5 inline-block mr-2" />
-                                Submit Score
-                            </button>
-                         </form>
-                    </div>
-                )}
 
-                {isSubmitted && (
-                     <div className="p-4 rounded-lg bg-green-100 text-green-800 text-center font-semibold">
-                        Your score has been saved to the leaderboard!
-                     </div>
-                )}
-
-
-                <div className="text-center pt-4 pb-8">
+                <div className="text-center pt-4">
                     <button onClick={onReturnToMenu} className="bg-brand-accent hover:bg-brand-accent/80 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg">
                         Return to Menu
                     </button>
