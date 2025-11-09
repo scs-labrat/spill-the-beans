@@ -1,8 +1,8 @@
-
 export interface Persona {
   id: string;
   name: string;
   role: string;
+  voiceName?: string;
   psychology: string;
   strengths: string;
   weaknesses: string;
@@ -37,3 +37,5 @@ export interface AnalysisResult {
 }
 
 export type AppState = 'menu' | 'inConversation' | 'managingPersonas' | 'sessionAnalysis';
+
+export type GameMode = 'elicit' | 'resist';

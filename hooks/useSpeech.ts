@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateSpeech } from '../services/geminiService';
 
@@ -50,6 +51,12 @@ export const useSpeech = (onTranscript: (transcript: string) => void) => {
   const [speechError, setSpeechError] = useState<string | null>(null);
   const recognitionRef = useRef<any | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const onTranscriptRef = useRef(onTranscript);
+  const finalTranscriptRef = useRef('');
+
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
 
   useEffect(() => {
     if (!speechRecognitionAvailable) {
@@ -58,14 +65,20 @@ export const useSpeech = (onTranscript: (transcript: string) => void) => {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      onTranscript(transcript);
-      setIsListening(false);
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscriptRef.current += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      onTranscriptRef.current(finalTranscriptRef.current + interimTranscript);
       setSpeechError(null); // Clear error on success
     };
 
@@ -74,9 +87,11 @@ export const useSpeech = (onTranscript: (transcript: string) => void) => {
       if (event.error === 'no-speech') {
         setSpeechError("Sorry, I didn't catch that. Please try again.");
       } else if (event.error === 'audio-capture') {
-        setSpeechError("Audio capture error. Check microphone and permissions.");
+        setSpeechError("Audio capture error. Check your microphone connection.");
+      } else if (event.error === 'not-allowed') {
+        setSpeechError("Microphone access denied. Please allow microphone permissions in your browser settings.");
       } else {
-        setSpeechError("A speech recognition error occurred.");
+        setSpeechError("A speech recognition error occurred. Please try again.");
       }
       setIsListening(false);
     };
@@ -86,17 +101,39 @@ export const useSpeech = (onTranscript: (transcript: string) => void) => {
     };
 
     recognitionRef.current = recognition;
-  }, [onTranscript]);
+
+    return () => {
+      // Cleanup on unmount
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array ensures this runs only on mount and unmount
 
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
       try {
         setSpeechError(null); // Clear previous errors
+        finalTranscriptRef.current = '';
         recognitionRef.current.start();
         setIsListening(true);
       } catch (error) {
-        console.error("Error starting speech recognition:", error);
-        setSpeechError("Could not start listening. Check microphone permissions.");
+        // This can happen if recognition is already running.
+        if (error instanceof DOMException && error.name === 'InvalidStateError') {
+          console.warn("Speech recognition already started.");
+        } else {
+          console.error("Error starting speech recognition:", error);
+          setSpeechError("Could not start listening. Check microphone permissions.");
+          setIsListening(false);
+        }
       }
     }
   }, [isListening]);
@@ -109,7 +146,7 @@ export const useSpeech = (onTranscript: (transcript: string) => void) => {
   }, [isListening]);
 
   const speak = useCallback(async (text: string, voiceName: string, onEnd?: () => void) => {
-    if (!audioContextRef.current) {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
       try {
         // Use a 24000 sample rate to match the API output
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });

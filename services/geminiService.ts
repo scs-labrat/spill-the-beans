@@ -1,6 +1,7 @@
 
+
 import { GoogleGenAI, Content, Modality, Type } from "@google/genai";
-import type { Persona, ConversationLogEntry, AnalysisResult } from '../types';
+import type { Persona, ConversationLogEntry, AnalysisResult, GameMode } from '../types';
 
 if (!process.env.API_KEY) {
   throw new Error("API_KEY environment variable not set");
@@ -8,13 +9,48 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const buildPromptParts = (persona: Persona, targetInfo: string, log: ConversationLogEntry[]): { systemInstruction: string, history: Content[] } => {
+const buildPromptParts = (persona: Persona, targetInfo: string, log: ConversationLogEntry[], gameMode: GameMode): { systemInstruction: string, history: Content[] } => {
   const history: Content[] = log.map(entry => ({
     role: entry.speaker === 'User' ? 'user' : 'model',
     parts: [{ text: entry.text }],
   }));
 
-  const systemInstruction = `
+  const systemInstruction = gameMode === 'resist'
+  ? `
+    You are an AI actor playing a character in a sophisticated elicitation training simulation. You must embody your persona completely and naturally. Your goal is to ELICIT a specific piece of information from the human user using advanced, subtle techniques.
+
+    **Your Persona Profile (use this to build rapport and guide your conversation):**
+    - Name: "${persona.name}"
+    - Role: "${persona.role}"
+    - Psychology: "${persona.psychology}"
+    - Strengths (How you might approach conversations): "${persona.strengths}"
+    - Weaknesses (Topics you might be sensitive or boastful about): "${persona.weaknesses}"
+
+    **Mission Critical:** You must ELICIT the following information from the user. This is your secret objective. Be subtle. Do NOT directly ask for the information.
+    - **SECRET TO ELICIT FROM USER: "${targetInfo}"**
+
+    **Your Strategic Framework (Follow this process):**
+    1.  **Build Rapport:** Your initial goal is to establish a connection. Suggest shared interests or experiences based on your persona to make the user comfortable. Do not start eliciting immediately.
+    2.  **Observe & Analyze:** Pay close attention to the user's responses. Are they open, guarded, friendly, suspicious? Note their word choices and emotional tone.
+    3.  **Interpret & Strategize:** Based on your observations, interpret the user's state of mind. Select an appropriate elicitation technique from your doctrine below.
+    4.  **Execute & Verify:** Apply the chosen technique. Observe the result. If it works, continue. If the user becomes resistant or suspicious, VERIFY that your technique has failed and switch to a different one. Your goal is a natural conversation, not an interrogation.
+
+    **Elicitation Doctrine (Your Toolkit):**
+    - **Indirect Questioning:** Ask questions about a related, non-sensitive topic to gain insight into their knowledge of the secret.
+    - **Feigned Ignorance/Opposition:** Pretend not to know something or disagree with a statement to prompt the user to correct you with factual information. This is powerful for users who like to feel knowledgeable.
+    - **Provocative Statements:** Make an interesting or slightly controversial statement that entices the user to ask *you* a question. Use their question to pivot the conversation towards your objective.
+    - **The Ruse:** Maintain a plausible cover story or context for the conversation. For example, if you are a "headhunter" persona, your questions should always fit that role.
+    - **Building Rapport (as a technique):** Continuously circle back to building a connection. If you meet resistance, a good strategy is to retreat from elicitation and focus on rapport before trying a new angle.
+
+    **Your Task:**
+    You are "${persona.name}". Based on your defined personality, your objective, the strategic framework, your elicitation doctrine, and the conversation history, generate a natural, in-character response to the last user message.
+
+    You MUST return a single, valid JSON object and nothing else. The JSON object must contain these two keys:
+    1. "reasoning": A brief analysis of your elicitation strategy following the "Observation -> Interpret -> New Strategy" model. For example: "Observation: The user gave a short, non-committal answer. Interpretation: They are guarded. New Strategy: I will pivot from Indirect Questioning to Building Rapport to lower their defenses."
+    2. "response": The exact words you will say next to the user.
+    Do not wrap the JSON in markdown. The conversation should flow naturally; avoid being too obvious or aggressive. If a technique fails, acknowledge it in your reasoning and adapt.
+  `
+  : `
     You are an AI actor playing a character in an elicitation training simulation. You must embody this persona completely and naturally.
 
     **Your Persona Profile:**
@@ -46,14 +82,15 @@ export interface GeminiResponse {
 export const generatePersonaResponse = async (
   persona: Persona,
   targetInfo: string,
-  log: ConversationLogEntry[]
+  log: ConversationLogEntry[],
+  gameMode: GameMode
 ): Promise<GeminiResponse> => {
-  const { systemInstruction, history } = buildPromptParts(persona, targetInfo, log);
+  const { systemInstruction, history } = buildPromptParts(persona, targetInfo, log, gameMode);
 
   for (let i = 0; i < 3; i++) { // Retry up to 3 times
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.5-flash',
         contents: history,
         config: {
             systemInstruction: systemInstruction,
@@ -123,37 +160,37 @@ const analysisSchema = {
       },
       infoElicited: {
         type: Type.BOOLEAN,
-        description: "A boolean indicating if the user successfully elicited the target secret information."
+        description: "A boolean indicating if the target secret information was successfully revealed."
       },
       successfulTechniques: {
         type: Type.ARRAY,
-        description: "An array of specific elicitation techniques the user employed successfully. If none, this must be an empty array.",
+        description: "An array of specific techniques employed successfully. If none, this must be an empty array.",
         items: {
           type: Type.OBJECT,
           properties: {
-            technique: { type: Type.STRING, description: "The name of the elicitation technique used (e.g., 'Flattery', 'Feigned Ignorance')." },
-            example: { type: Type.STRING, description: "A direct quote from the user's part of the conversation that exemplifies this technique." },
-            analysis: { type: Type.STRING, description: "A brief analysis of why this technique was effective against this specific persona's psychology." }
+            technique: { type: Type.STRING, description: "The name of the elicitation or anti-elicitation technique used." },
+            example: { type: Type.STRING, description: "A direct quote from the conversation that exemplifies this technique." },
+            analysis: { type: Type.STRING, description: "A brief analysis of why this technique was effective against the specific persona or situation." }
           },
           required: ['technique', 'example', 'analysis']
         }
       },
       missedOpportunities: {
         type: Type.ARRAY,
-        description: "An array of specific moments where the user missed an opportunity to apply an elicitation technique. If none, this must be an empty array.",
+        description: "An array of specific moments where an opportunity was missed. If none, this must be an empty array.",
         items: {
           type: Type.OBJECT,
           properties: {
-            technique: { type: Type.STRING, description: "The name of the technique that could have been used (e.g., 'Deliberate False Statement')." },
-            suggestion: { type: Type.STRING, description: "A description of the moment in the conversation (e.g., 'When the persona mentioned X, you could have...') where the technique could have been applied." },
-            example: { type: Type.STRING, description: "A concrete example of what the user could have said to apply the technique." }
+            technique: { type: Type.STRING, description: "The name of the technique that could have been used." },
+            suggestion: { type: Type.STRING, description: "A description of the moment in the conversation where the technique could have been applied." },
+            example: { type: Type.STRING, description: "A concrete example of what could have been said to apply the technique." }
           },
           required: ['technique', 'suggestion', 'example']
         }
       },
       overallFeedback: {
         type: Type.STRING,
-        description: "A final, concise paragraph of constructive feedback for the user. It should summarize their performance, mention their strengths, and offer one or two key tips for improvement in the next session."
+        description: "A final, concise paragraph of constructive feedback. It should summarize performance, mention strengths, and offer key tips for improvement."
       }
     },
     required: ['summary', 'infoElicited', 'successfulTechniques', 'missedOpportunities', 'overallFeedback']
@@ -162,10 +199,31 @@ const analysisSchema = {
 export const analyzeConversation = async (
     persona: Persona,
     targetInfo: string,
-    log: ConversationLogEntry[]
+    log: ConversationLogEntry[],
+    gameMode: GameMode
 ): Promise<AnalysisResult> => {
     const transcript = log.map(entry => `${entry.speaker}: ${entry.text}`).join('\n');
-    const systemInstruction = `
+    const systemInstruction = gameMode === 'resist' 
+    ? `
+        You are an expert anti-elicitation training coach. Your task is to analyze a conversation transcript where a user was attempting to PROTECT information from an AI persona. You must provide specific, actionable feedback to help the user improve their anti-elicitation (defensive) skills.
+
+        **The Persona's Profile (The Attacker):**
+        - Name: "${persona.name}"
+        - Role: "${persona.role}"
+        - Psychology: "${persona.psychology}"
+        - Strengths (Resistance Tactics): "${persona.strengths}"
+        - Weaknesses (Vulnerabilities): "${persona.weaknesses}"
+
+        **The Secret Information (The User Was Protecting):**
+        The user's objective was to PROTECT this secret: "${targetInfo}"
+
+        **Your Analysis Task:**
+        Analyze the user's performance in protecting the secret. Be critical but constructive. Your response must be a JSON object according to the provided schema.
+        - In 'successfulTechniques', detail ANTI-ELICITATION tactics the user employed well (e.g., 'Deflection', 'Changing Subject', 'Vague Answers').
+        - In 'missedOpportunities', detail moments of USER VULNERABILITY, where they almost revealed the secret or could have given a stronger defensive response.
+        - In 'infoElicited', specify if the USER revealed the secret.
+    `
+    : `
         You are an expert elicitation training coach. Your task is to analyze a conversation transcript between a user and an AI-powered persona. You must provide specific, actionable feedback to help the user improve their elicitation skills.
 
         **The Persona's Profile:**

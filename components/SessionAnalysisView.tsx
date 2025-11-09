@@ -1,12 +1,14 @@
 
 import React from 'react';
-import type { AnalysisResult } from '../types';
+import type { AnalysisResult, GameMode } from '../types';
 import { CheckCircleIcon, XCircleIcon, LightbulbIcon, TargetIcon, BrainIcon } from './icons';
 
 interface SessionAnalysisViewProps {
     analysis: AnalysisResult | null;
     isLoading: boolean;
     onReturnToMenu: () => void;
+    gameMode: GameMode;
+    targetInfo: string;
 }
 
 const LoadingView: React.FC = () => (
@@ -30,7 +32,7 @@ const AnalysisCard: React.FC<{ title: string; icon: React.ReactNode; children: R
 );
 
 
-const SessionAnalysisView: React.FC<SessionAnalysisViewProps> = ({ analysis, isLoading, onReturnToMenu }) => {
+const SessionAnalysisView: React.FC<SessionAnalysisViewProps> = ({ analysis, isLoading, onReturnToMenu, gameMode, targetInfo }) => {
 
     if (isLoading || !analysis) {
         return (
@@ -40,19 +42,26 @@ const SessionAnalysisView: React.FC<SessionAnalysisViewProps> = ({ analysis, isL
         );
     }
 
+    const objectiveMet = gameMode === 'elicit' ? analysis.infoElicited : !analysis.infoElicited;
+
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-6 h-full overflow-y-auto">
             <div className="space-y-6">
-                <div className={`p-6 rounded-lg text-white flex items-center gap-4 ${analysis.infoElicited ? 'bg-green-600' : 'bg-red-500'}`}>
-                    {analysis.infoElicited ? <CheckCircleIcon className="w-12 h-12 flex-shrink-0" /> : <XCircleIcon className="w-12 h-12 flex-shrink-0" />}
+                <div className={`p-6 rounded-lg text-white flex items-center gap-4 ${objectiveMet ? 'bg-green-600' : 'bg-red-500'}`}>
+                    {objectiveMet ? <CheckCircleIcon className="w-12 h-12 flex-shrink-0" /> : <XCircleIcon className="w-12 h-12 flex-shrink-0" />}
                     <div>
-                        <h2 className="text-2xl font-bold">{analysis.infoElicited ? "Objective Achieved!" : "Objective Not Met"}</h2>
+                        <h2 className="text-2xl font-bold">{objectiveMet ? "Objective Achieved!" : "Objective Not Met"}</h2>
                         <p className="text-lg opacity-90">{analysis.summary}</p>
+                        {gameMode === 'resist' && (
+                            <p className="mt-2 text-sm opacity-90 border-t border-white/30 pt-2">
+                                <span className="font-semibold">The AI's Secret Objective:</span> Elicit "{targetInfo}"
+                            </p>
+                        )}
                     </div>
                 </div>
 
                 {analysis.successfulTechniques && analysis.successfulTechniques.length > 0 && (
-                     <AnalysisCard title="Successful Techniques" icon={<TargetIcon className="w-6 h-6 text-brand-accent" />}>
+                     <AnalysisCard title={gameMode === 'elicit' ? "Successful Techniques" : "Successful Resistance"} icon={<TargetIcon className="w-6 h-6 text-brand-accent" />}>
                         {analysis.successfulTechniques.map((item, index) => (
                              <div key={index} className="p-3 bg-brand-secondary/50 rounded-md">
                                 <p className="font-bold text-brand-text">{item.technique}</p>
@@ -64,7 +73,7 @@ const SessionAnalysisView: React.FC<SessionAnalysisViewProps> = ({ analysis, isL
                 )}
 
                 {analysis.missedOpportunities && analysis.missedOpportunities.length > 0 && (
-                    <AnalysisCard title="Missed Opportunities" icon={<LightbulbIcon className="w-6 h-6 text-yellow-500" />}>
+                    <AnalysisCard title={gameMode === 'elicit' ? "Missed Opportunities" : "Vulnerable Moments"} icon={<LightbulbIcon className="w-6 h-6 text-yellow-500" />}>
                         {analysis.missedOpportunities.map((item, index) => (
                              <div key={index} className="p-3 bg-brand-secondary/50 rounded-md">
                                 <p className="font-bold text-brand-text">Could have used: {item.technique}</p>
